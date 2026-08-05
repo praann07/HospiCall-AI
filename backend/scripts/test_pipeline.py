@@ -30,7 +30,24 @@ with tqdm(total=4, desc="Importing modules", ascii=True) as bar:
         print(f"FAIL import: {e}")
         sys.exit(1)
 
-# 2. live Ollama check
+# 2. booking logic self-check (no server needed)
+from app.services.brain import parse_slot
+print("\n--- Booking logic checks ---")
+assert parse_slot("10 AM works") == "10 AM"
+assert parse_slot("book 2 PM please") == "2 PM"
+assert parse_slot("sure, 9am") == "9 AM"
+assert parse_slot("maybe") is None
+assert parse_slot("13 PM") is None
+print("OK parse_slot")
+
+from app.main import _target_day, _slot_to_datetime
+from datetime import timedelta
+tomorrow = _target_day("tomorrow")
+assert (_slot_to_datetime(tomorrow, "10 AM")).time().hour == 10
+assert (_slot_to_datetime(tomorrow, "2 PM")).time().hour == 14
+print("OK slot_to_datetime")
+
+# 3. live Ollama check
 brain = Brain(settings.ollama_url, settings.llm_model)
 print("\n--- Live test against Ollama ---")
 try:

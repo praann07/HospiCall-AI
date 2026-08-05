@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HospiCall — AI Receptionist Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(160deg, #0f2027, #203a43, #2c5364);
+    min-height: 100vh; color: #e8f0f5; display: flex; flex-direction: column;
+  }
+  header { text-align: center; padding: 28px 16px 8px; }
+  header h1 { font-size: 2rem; letter-spacing: 0.5px; }
+  header h1 span { color: #4fc3f7; }
+  header p { color: #9fb6c4; margin-top: 6px; font-size: 0.95rem; }
+  main { flex: 1; max-width: 720px; margin: 0 auto; padding: 24px 16px; width: 100%; }
+  .phone { background: #142c3a; border-radius: 18px; padding: 24px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+  .mic-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .mic-btn {
+    width: 92px; height: 92px; border-radius: 50%; border: none; cursor: pointer;
+    background: radial-gradient(circle at 30% 30%, #66bb6a, #2e7d32);
+    color: white; font-size: 2.4rem; transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 6px 20px rgba(46,125,50,.5);
+  }
+  .mic-btn:active { transform: scale(.95); }
+  .mic-btn.recording { background: radial-gradient(circle at 30% 30%, #ef5350, #c62828); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,.6);} 50% { box-shadow: 0 0 0 22px rgba(239,83,80,0);} }
+  .mic-hint { color: #9fb6c4; font-size: .9rem; }
+  #status { color: #ffd54f; min-height: 1.2em; font-size: .95rem; text-align: center; }
+  .transcript { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+  .bubble { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: .95rem; line-height: 1.4; }
+  .bubble.patient { align-self: flex-end; background: #1e88e5; border-bottom-right-radius: 4px; }
+  .bubble.ai { align-self: flex-start; background: #263238; border-bottom-left-radius: 4px; }
+  .bubble .who { display: block; font-size: .72rem; opacity: .7; margin-bottom: 3px; }
+  .bubble.error { background: #7f1d1d; }
+  .empty { text-align: center; color: #5d7683; padding: 30px 0; }
+  footer { text-align: center; padding: 16px; color: #5d7683; font-size: .8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏥 Hospi<span>Call</span></h1>
+  <p>AI voice receptionist · press and talk · runs 100% locally</p>
+</header>
+<main>
+  <div class="phone">
+    <div class="mic-wrap">
+      <button class="mic-btn" id="micBtn" title="Press to talk">🎙️</button>
+      <div class="mic-hint" id="hint">Press the mic and speak to book an appointment</div>
+      <div id="status"></div>
+    </div>
+    <div class="transcript" id="transcript">
+      <div class="empty" id="empty">The conversation will appear here.</div>
+    </div>
+  </div>
+</main>
+<footer>Demo uses synthetic data only · HospiCall © 2026</footer>
+
+<script>
+const micBtn = document.getElementById('micBtn');
+const statusEl = document.getElementById('status');
+const hintEl = document.getElementById('hint');
+const transcriptEl = document.getElementById('transcript');
+const emptyEl = document.getElementById('empty');
+
+const callId = 'browser-' + Date.now();
+let mediaRecorder = null;
+let chunks = [];
+let recording = false;
+
+async function startRecording() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  chunks = [];
+  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.onstop = sendAudio;
+  mediaRecorder.start();
+  recording = true;
+  micBtn.classList.add('recording');
+  hintEl.textContent = 'Recording… press again to stop';
+}
+
+function stopRecording() {
+  mediaRecorder.stop();
+  recording = false;
+  micBtn.classList.remove('recording');
+  hintEl.textContent = 'Listening…';
+  mediaRecorder.stream.getTracks().forEach(t => t.stop());
+}
+
+micBtn.addEventListener('click', () => recording ? stopRecording() : startRecording().catch(() => {
+  statusEl.textContent = 'Microphone blocked. Use a browser that allows mic access.';
+}));
+
+async function sendAudio() {
+  const blob = new Blob(chunks, { type: chunks[0] ? chunks[0].type : 'audio/webm' });
+  statusEl.textContent = 'Transcribing & thinking…';
+  const fd = new FormData();
+  fd.append('file', blob, 'recording.webm');
+  try {
+    const res = await fetch('/calls/audio?call_id=' + encodeURIComponent(callId), { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    statusEl.textContent = '';
+    addBubble('patient', 'You', data.user_text);
+    addBubble('ai', 'HospiCall', data.response);
+    await speak(data.response);
+  } catch (err) {
+    statusEl.textContent = '';
+    addBubble('error', 'System', 'Connection failed: ' + err.message);
+  }
+}
+
+function addBubble(cls, who, text) {
+  if (emptyEl) emptyEl.remove();
+  const div = document.createElement('div');
+  div.className = 'bubble ' + cls;
+  div.innerHTML = '<span class="who">' + who + '</span>' + escapeHtml(text);
+  transcriptEl.appendChild(div);
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function speak(text) {
+  statusEl.textContent = 'Speaking…';
+  try {
+    const res = await fetch('/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    await new Promise((resolve, reject) => { audio.onended = resolve; audio.onerror = reject; audio.play(); });
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    statusEl.textContent = '(TTS unavailable — reply shown as text)';
+  }
+  statusEl.textContent = '';
+  hintEl.textContent = 'Press the mic and speak';
+}
+</script>
+</body>
+</html>

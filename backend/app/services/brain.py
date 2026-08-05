@@ -1,3 +1,4 @@
+import re
 import httpx
 
 SPECIALTY_KEYWORDS = {
@@ -26,9 +27,33 @@ EMERGENCY_KEYWORDS = ["emergency", "ambulance", "heart attack", "unconscious", "
 INQUIRY_KEYWORDS = ["timing", "open", "hours", "location", "address", "reach", "parking", "fee", "cost", "charge", "where", "phone number", "contact"]
 OUT_OF_SCOPE_KEYWORDS = ["medical advice", "symptom", "diagnos", "treatment for", "prescription", "should i take", "is it serious"]
 
+SLOT_RE = re.compile(r"\b(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)\b")
+
+
+def parse_slot(text: str) -> str | None:
+    """Extract a slot label like '10 AM' from text ('at 10 am', 'book 2 PM')."""
+    m = SLOT_RE.search(text.lower())
+    if not m:
+        return None
+    hour, mer = int(m.group(1)), m.group(2).replace(".", "").lower()
+    if hour < 1 or hour > 12:
+        return None
+    return f"{hour} {mer.upper()}"
+
 
 class Brain:
     """LLM wrapper around Ollama (Llama 3.1 8B)."""
+
+    def confirm_booking(self, text: str, pending: dict) -> str | None:
+        """If a booking is pending, parse a chosen slot like '10 AM' from the text.
+        Returns the slot label (e.g. '10 AM') or None if no slot chosen."""
+        low = text.lower()
+        slot = parse_slot(low)
+        if not slot:
+            return None
+        if slot in pending.get("offered", []):
+            return slot
+        return None
 
     def fast_handle(self, text: str, find_slots: callable) -> tuple | None:
         """Instant keyword-based response. Returns (intent, response) or None if LLM needed."""

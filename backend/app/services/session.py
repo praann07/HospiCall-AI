@@ -15,6 +15,7 @@ class SessionManager:
             "phone": phone,
             "transcript": [],
             "slots": {},
+            "pending_booking": None,
             "created_at": datetime.now().isoformat(),
             "last_activity": datetime.now(),
         }
@@ -37,6 +38,20 @@ class SessionManager:
         s = self.get(call_id)
         if s:
             s["slots"].update(slots)
+
+    def set_pending_booking(self, call_id: str, pending: dict):
+        s = self.get(call_id)
+        if s:
+            s["pending_booking"] = pending
+
+    def get_pending_booking(self, call_id: str) -> dict | None:
+        s = self.get(call_id)
+        return s["pending_booking"] if s else None
+
+    def clear_pending_booking(self, call_id: str):
+        s = self.get(call_id)
+        if s:
+            s["pending_booking"] = None
 
     def end(self, call_id: str):
         self._sessions.pop(call_id, None)

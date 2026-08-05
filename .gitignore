@@ -8,6 +8,7 @@ data/*.log
 data/test_response.wav
 data/hospicall.db
 data/*.wav
+data/tmp/
 
 # Python
 __pycache__/
