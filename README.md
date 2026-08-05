@@ -51,10 +51,10 @@ Every patient turn hits the **fast-path first** — a keyword-based intent + slo
 
 | Turn | Path | Latency |
 |---|---|---|
-| "Book a cardiologist tomorrow" | Fast-path → real DB availability | **~80ms** |
-| "What are your timings?" | Fast-path → template | **~80ms** |
-| "Emergency!" | Fast-path → triage script | **~80ms** |
-| Anything unusual (20% of turns) | Llama 3.1 8B fallback | ~15–19s (CPU) |
+| "Book a cardiologist tomorrow" | Fast-path → real DB availability | **~80ms** (text) / **~16s** (voice turn) |
+| "What are your timings?" | Fast-path → template | **~80ms** (text) / **~16s** (voice turn) |
+| "Emergency!" | Fast-path → triage script | **~80ms** (text) / **~16s** (voice turn) |
+| Anything unusual (20% of turns) | Llama 3.1 8B fallback | ~15–35s (CPU) |
 
 **Why a fallback at all?** The fast-path handles the 80% routine; the LLM handles the long tail. That split keeps real calls snappy without spending on GPU clouds.
 
@@ -81,10 +81,10 @@ Every patient turn hits the **fast-path first** — a keyword-based intent + slo
 ollama pull llama3.1:8b-instruct-q4_K_M
 ```
 In **OmniVoice Studio → Settings**, install:
-- `OmniVoice TTS` (TTS engine)
-- `Whisper large-v3 (faster-whisper)` (ASR engine)
+- `KittenTTS` (TTS engine, CPU-realtime)
+- `Parakeet TDT v3` (sherpa-onnx ASR — **8× faster than Whisper on CPU**) or `Whisper large-v3`
 
-Then **Start Server** — confirm `http://localhost:3900`.
+Then **Start Server** — confirm `http://localhost:3900`. In **Settings → Engines**, set the active **ASR backend to `Sherpa-ONNX dictation`** (Parakeet) for fast CPU transcription — the default WhisperX engine is slow on CPU.
 
 ### 2. Run the backend
 ```bash
