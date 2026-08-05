@@ -23,11 +23,15 @@
     background: radial-gradient(circle at 30% 30%, #66bb6a, #2e7d32);
     color: white; font-size: 2.4rem; transition: transform .15s, box-shadow .15s;
     box-shadow: 0 6px 20px rgba(46,125,50,.5);
+    user-select: none; -webkit-user-select: none; touch-action: none;
   }
   .mic-btn:active { transform: scale(.95); }
   .mic-btn.recording { background: radial-gradient(circle at 30% 30%, #ef5350, #c62828); animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,.6);} 50% { box-shadow: 0 0 0 22px rgba(239,83,80,0);} }
-  .mic-hint { color: #9fb6c4; font-size: .9rem; }
+  .meter { width: 70%; height: 10px; border-radius: 5px; background: #1d3644; overflow: hidden; visibility: hidden; }
+  .meter .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #4fc3f7, #4caf50); transition: width .06s linear; }
+  .meter.active { visibility: visible; }
+  .mic-hint { color: #9fb6c4; font-size: .9rem; min-height: 1.2em; }
   #status { color: #ffd54f; min-height: 1.2em; font-size: .95rem; text-align: center; }
   .transcript { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
   .bubble { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: .95rem; line-height: 1.4; }
@@ -47,8 +51,9 @@
 <main>
   <div class="phone">
     <div class="mic-wrap">
-      <button class="mic-btn" id="micBtn" title="Press to talk">🎙️</button>
-      <div class="mic-hint" id="hint">Press the mic and speak to book an appointment</div>
+      <button class="mic-btn" id="micBtn" title="Hold to talk">🎙️</button>
+      <div class="meter" id="meter"><div class="fill" id="meterFill"></div></div>
+      <div class="mic-hint" id="hint">Press and HOLD the mic while you speak, release when done</div>
       <div id="status"></div>
     </div>
     <div class="transcript" id="transcript">
@@ -64,38 +69,78 @@ const statusEl = document.getElementById('status');
 const hintEl = document.getElementById('hint');
 const transcriptEl = document.getElementById('transcript');
 const emptyEl = document.getElementById('empty');
+const meterEl = document.getElementById('meter');
+const meterFill = document.getElementById('meterFill');
 
 const callId = 'browser-' + Date.now();
 let mediaRecorder = null;
 let chunks = [];
 let recording = false;
+let audioCtx = null;
+let analyser = null;
+let meterRAF = null;
+
+micBtn.addEventListener('pointerdown', e => { e.preventDefault(); startRecording(); });
+window.addEventListener('pointerup', () => { if (recording) stopRecording(); });
+micBtn.addEventListener('contextmenu', e => e.preventDefault());
 
 async function startRecording() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  chunks = [];
-  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
-  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-  mediaRecorder.ondataavailable = e => chunks.push(e.data);
-  mediaRecorder.onstop = sendAudio;
-  mediaRecorder.start();
-  recording = true;
-  micBtn.classList.add('recording');
-  hintEl.textContent = 'Recording… press again to stop';
+  if (recording) return;
+  statusEl.textContent = 'Mic access…';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = [];
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = sendAudio;
+    mediaRecorder.start();
+    recording = true;
+    micBtn.classList.add('recording');
+    hintEl.textContent = 'Listening… speak now, release to send';
+    statusEl.textContent = '';
+    startMeter(stream);
+  } catch (err) {
+    statusEl.textContent = 'Microphone blocked — check browser permissions and retry.';
+    recording = false;
+  }
+}
+
+function startMeter(stream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  meterEl.classList.add('active');
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  const tick = () => {
+    analyser.getByteTimeDomainData(data);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = Math.abs(data[i] - 128) / 128;
+      if (v > peak) peak = v;
+    }
+    meterFill.style.width = Math.min(100, peak * 180) + '%';
+    meterRAF = requestAnimationFrame(tick);
+  };
+  tick();
 }
 
 function stopRecording() {
-  mediaRecorder.stop();
+  if (!recording) return;
   recording = false;
   micBtn.classList.remove('recording');
-  hintEl.textContent = 'Listening…';
+  cancelAnimationFrame(meterRAF);
+  meterEl.classList.remove('active');
+  meterFill.style.width = '0%';
+  hintEl.textContent = 'Processing…';
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
 }
 
-micBtn.addEventListener('click', () => recording ? stopRecording() : startRecording().catch(() => {
-  statusEl.textContent = 'Microphone blocked. Use a browser that allows mic access.';
-}));
-
 async function sendAudio() {
+  if (!chunks.length) { hintEl.textContent = 'Press and HOLD the mic while you speak'; return; }
   const blob = new Blob(chunks, { type: chunks[0] ? chunks[0].type : 'audio/webm' });
   statusEl.textContent = 'Transcribing & thinking…';
   const fd = new FormData();
@@ -145,7 +190,7 @@ async function speak(text) {
     statusEl.textContent = '(TTS unavailable — reply shown as text)';
   }
   statusEl.textContent = '';
-  hintEl.textContent = 'Press the mic and speak';
+  hintEl.textContent = 'Press and HOLD the mic while you speak';
 }
 </script>
 </body>
