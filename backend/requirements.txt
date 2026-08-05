@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+httpx
+sqlalchemy
+pydantic-settings
+pydub
+tqdm

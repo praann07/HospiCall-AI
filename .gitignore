@@ -1,0 +1,20 @@
+# Installers & logs
+*.msi
+install*.log
+install_req.json
+
+# Generated data & audio
+data/*.log
+data/test_response.wav
+data/hospicall.db
+data/*.wav
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor/OS
+.DS_Store
+Thumbs.db
