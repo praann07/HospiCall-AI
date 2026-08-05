@@ -1,5 +1,6 @@
 import re
 import httpx
+from typing import Callable, Optional
 
 SPECIALTY_KEYWORDS = {
     "cardiology": ["cardio", "heart", "chest pain", "bp", "blood pressure"],
@@ -41,6 +42,13 @@ def parse_slot(text: str) -> str | None:
     return f"{hour} {mer.upper()}"
 
 
+GREETING_KEYWORDS = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "namaste", "namaskar"]
+DOCTOR_LIST_KEYWORDS = ["what doctor", "which doctor", "list of doctor", "list the doctor", "doctors do you have",
+                        "what specialist", "all the doctor", "who are the doctor", "hospitals are present",
+                        "what hospitals", "list of hospitals", "departments do you have"]
+NAME_RE = re.compile(r"\b(?:my name is|i am|i'm|this is)\s+([a-z][a-z .'-]+?)(?:\s|$|[,.])", re.IGNORECASE)
+
+
 class Brain:
     """LLM wrapper around Ollama (Llama 3.1 8B)."""
 
@@ -55,7 +63,7 @@ class Brain:
             return slot
         return None
 
-    def fast_handle(self, text: str, find_slots: callable) -> tuple | None:
+    def fast_handle(self, text: str, find_slots: Callable, list_doctors: Optional[Callable] = None) -> tuple | None:
         """Instant keyword-based response. Returns (intent, response) or None if LLM needed."""
         low = text.lower()
 
@@ -67,6 +75,20 @@ class Brain:
             return ("reschedule", "I can help you reschedule. Could you tell me your registered phone number and the day you'd prefer?")
         if any(k in low for k in OUT_OF_SCOPE_KEYWORDS):
             return ("out_of_scope", "I can't give medical advice, but I can book you an appointment or connect you to a doctor.")
+
+        m = NAME_RE.search(low)
+        if m and len(m.group(1).split()) <= 3:
+            name = m.group(1).strip().title()
+            return ("human", f"Nice to meet you, {name}! I can book an appointment, check timings, or tell you about our departments. What do you need?")
+
+        if list_doctors and any(k in low for k in DOCTOR_LIST_KEYWORDS):
+            doctors = list_doctors()
+            if doctors:
+                return ("inquiry", f"Our hospital has {len(doctors)} departments. We have {', '.join(doctors)}. "
+                                    "Which one would you like to visit?")
+
+        if any(k in low for k in GREETING_KEYWORDS) and len(low) < 20:
+            return ("human", "Hello! Welcome to City Hospital. I can book an appointment, check timings, or tell you about our departments. How can I help?")
 
         specialty = next((s for s, kws in SPECIALTY_KEYWORDS.items() if any(k in low for k in kws)), None)
         timing = next((t for t, kws in TIMING_KEYWORDS.items() if any(k in low for k in kws)), "tomorrow")

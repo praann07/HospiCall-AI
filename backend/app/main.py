@@ -93,8 +93,16 @@ def _appt_between(q, doc_id, start, end):
     )
 
 
+def _list_doctors() -> list[str]:
+    with Session() as db:
+        rows = db.query(Doctor).all()
+        names = sorted({f"{d.name} ({d.specialization})" for d in rows})
+        return names
+
+
 def process_text(call_id: str, text: str) -> dict:
     """Shared brain: handles booking confirmation, fast-path, and LLM fallback."""
+    sessions.add_turn(call_id, "patient", text)
     pending = sessions.get_pending_booking(call_id)
     if pending:
         chosen = brain.confirm_booking(text, pending)
@@ -105,7 +113,7 @@ def process_text(call_id: str, text: str) -> dict:
         else:
             intent, response = _fallback_brain(call_id, text)
     else:
-        fast = brain.fast_handle(text, find_slots)
+        fast = brain.fast_handle(text, find_slots, _list_doctors)
         if fast:
             intent, response = fast
             if intent == "book":
@@ -115,7 +123,6 @@ def process_text(call_id: str, text: str) -> dict:
         else:
             intent, response = _fallback_brain(call_id, text)
 
-    sessions.add_turn(call_id, "patient", text)
     sessions.update_slots(call_id, intent=intent)
     with Session() as db:
         db.add(Intent(call_id=call_id, intent_type=intent, slots_json="{}"))
