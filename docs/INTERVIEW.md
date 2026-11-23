@@ -7,7 +7,7 @@ Everything here is true of the code in this repository. Numbers can be reproduce
 > HospiCall is a self-hosted AI receptionist for hospitals. A caller — by browser voice or text — can book, cancel and
 > reschedule appointments and ask about hours, location and fees. The design point is safety: a deterministic agent makes
 > every decision and every database write, an optional local LLM only helps with wording, and the system is honest in
-> emergencies about being automated. It has 405 tests at 97 % coverage plus a separate evaluation suite — 100 % intent
+> emergencies about being automated. It has 406 tests at 97 % coverage plus a separate evaluation suite — 100 % intent
 > accuracy on 97 labelled utterances, 26/26 multi-turn dialogues, 19/19 safety red-team cases — enforced in CI.
 
 ## 3-minute demo script
@@ -56,7 +56,7 @@ phone numbers. The HTTP layer also has body-size caps, per-route rate limits, an
 real telephony provides and the browser demo does not.
 
 **How do you know it works?**
-Three layers. (1) 405 unit/integration tests, including concurrency and every HTTP error path. (2) A separate eval
+Three layers. (1) 406 unit/integration tests, including concurrency and every HTTP error path. (2) A separate eval
 suite that measures what a caller needs: intent accuracy, scripted dialogues, a safety red-team, latency percentiles —
 with gates that fail CI. (3) A live run against a real uvicorn server. The first eval run failed 11 cases; fixing them
 found real bugs, like "how much is the consultation fee" being treated as a booking request.
@@ -88,7 +88,7 @@ Redis sessions; Hindi/Telugu; and a held-out paraphrase eval that tracks LLM-pat
 
 | | |
 |---|---|
-| Tests | 405 passing, 97 % line coverage |
+| Tests | 406 passing, 97 % line coverage |
 | Intent accuracy | 100 % (97 utterances, 22 labels; gate ≥ 95 %) |
 | Dialogues / safety | 26/26 · 19/19 |
 | Latency | p50 ≈ 0.6 ms, p95 ≈ 3.4 ms on the rules path |

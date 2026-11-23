@@ -2,7 +2,7 @@
 
 **A safety-first voice & chat receptionist for hospitals — books, cancels and reschedules appointments, answers hospital questions, and refuses to play doctor.**
 
-![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688) ![Tests](https://img.shields.io/badge/tests-405%20passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen) ![Evals](https://img.shields.io/badge/agent%20evals-100%25-brightgreen) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688) ![Tests](https://img.shields.io/badge/tests-406%20passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen) ![Evals](https://img.shields.io/badge/agent%20evals-100%25-brightgreen) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 HospiCall runs entirely on your own machine: FastAPI + SQLite, optional local speech (OmniVoice Studio) and an optional local LLM (Ollama). **No cloud APIs, no per-call cost, no patient data leaves the box.**
 
@@ -108,7 +108,7 @@ Interactive docs: <http://localhost:8000/docs>. Configuration: [`.env.example`](
 ```bash
 cd backend
 ruff check app scripts tests evals                 # lint
-pytest --cov=app                                    # 405 tests, 97% line coverage (includes the eval gate)
+pytest --cov=app                                    # 406 tests, 97% line coverage (includes the eval gate)
 python -m evals.run_evals                           # scripted agent evaluation, exits 1 below the gates
 python -m evals.run_evals --llm                     # same, with a live Ollama model in the loop
 ```
@@ -145,7 +145,7 @@ backend/
       session.py        in-memory sessions with TTL
       audit.py · metrics.py · ratelimit.py · resilience.py
     static/index.html   chat + voice UI
-  tests/                405 tests (pytest)
+  tests/                406 tests (pytest)
   evals/                scenarios.json + run_evals.py (agent evaluation harness)
   scripts/seed_db.py    `python -m scripts.seed_db`
 docs/

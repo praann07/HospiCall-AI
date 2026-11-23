@@ -57,19 +57,38 @@ def test_never_offers_a_time_the_caller_already_holds(caller, scheduler):
     assert "9 AM" in offered and "11 AM" in offered and "10 AM" not in offered
 
 
-def test_unverified_caller_is_not_told_about_an_existing_appointment(caller, scheduler):
-    book_for_demo_patient(scheduler)
+def test_unverified_slot_list_does_not_depend_on_what_the_number_holds(caller, scheduler):
+    """A missing slot would be an oracle for "this number has an appointment then", so nothing is filtered."""
+    book_for_demo_patient(scheduler)  # Neurology tomorrow 10 AM
     reply = caller.say("book a cardiologist tomorrow morning")
     assert "already have" not in reply.text and "Neurology" not in reply.text
-    assert "9 AM" in reply.text and "11 AM" in reply.text and "10 AM" not in reply.text
+    assert "9 AM" in reply.text and "10 AM" in reply.text and "11 AM" in reply.text
 
 
-def test_unverified_caller_asking_for_a_held_time_gets_a_generic_refusal(caller, scheduler):
+def test_unverified_caller_asking_for_a_held_time_looks_like_a_lost_race(caller, scheduler):
     book_for_demo_patient(scheduler)
     caller.run("book dr kapoor tomorrow at 10 am", "skip")
     reply = caller.say("yes")
+    assert "just taken" in reply.text  # same words as a genuine SlotTaken
     assert "already have" not in reply.text and "Neurology" not in reply.text
     assert reply.outcome is None
+    assert "tomorrow at 10 AM" not in reply.text.split("just taken.")[1]  # and it is not offered again
+    assert len(scheduler.upcoming(PHONE)) == 1
+
+
+def test_unverified_caller_at_the_booking_limit_is_not_told_why(caller, scheduler):
+    from datetime import datetime
+
+    from app.services.scheduler import MAX_UPCOMING
+    for day in range(MAX_UPCOMING):
+        slot = next(s for s in scheduler.available_slots("Neurology", day=None, hour=10, limit=20)
+                    if s.start == datetime(2026, 11, 24 + day, 10, 0))
+        scheduler.book(PHONE, "Asha", slot)
+    caller.run("book a cardiologist tomorrow at 9 am", "skip")
+    reply = caller.say("yes")
+    assert reply.outcome is None and reply.options and "maximum" not in reply.text
+    assert "appointment" not in reply.text
+    assert len(scheduler.upcoming(PHONE)) == MAX_UPCOMING
 
 
 def test_declining_confirmation_does_not_book(caller, scheduler):

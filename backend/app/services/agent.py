@@ -283,11 +283,14 @@ class Agent:
                     {k: v for k, v in filters.items() if k == "day"}, {}]
         slots, used = [], filters
         for used in attempts:
-            # Times the caller already holds are left out silently; only a verified caller is told why.
+            # Only a verified caller gets their own held times filtered out (and is told why). For anyone else a
+            # missing slot would reveal that the number holds an appointment then, so the list must not depend on it.
             slots = [s for s in self.sched.available_slots(flow["specialty"], doctor_id=flow["doctor_id"],
-                                                           limit=SLOT_CHOICES + 1, exclude_phone=session.phone,
+                                                           limit=SLOT_CHOICES + 1,
+                                                           exclude_phone=session.phone if session.verified else None,
                                                            **used)
-                     if s.start != flow.get("current_start")][:SLOT_CHOICES]
+                     if s.start != flow.get("current_start") and s.start not in flow.get("rejected", ())
+                     ][:SLOT_CHOICES]
             if slots:
                 break
         if not slots:
@@ -338,8 +341,10 @@ class Agent:
             appt = (self.sched.book(session.phone, session.name, slot) if booking
                     else self.sched.reschedule(flow["appt_id"], session.phone, slot))
         except DuplicateBooking:
-            if not session.verified:  # do not reveal an existing appointment to an unverified caller
-                return self._offer_slots(session, flow, {}, "Sorry, that time isn't available. ")
+            if not session.verified:
+                # Indistinguishable from losing a race for the slot, so an unverified caller learns nothing.
+                flow.setdefault("rejected", []).append(slot.start)
+                return self._offer_slots(session, flow, {}, "Sorry, that time was just taken. ")
             self._reset(session)
             return Reply("You already have an appointment at that time, so I haven't booked a new one. Would you "
                          "like a different time?", flow["purpose"])
@@ -347,6 +352,10 @@ class Agent:
             return self._offer_slots(session, flow, {}, "Sorry, that time was just taken. ")
         except BookingLimit:
             self._reset(session)
+            if not session.verified:  # do not disclose how many appointments a number holds
+                self._audit(session, "booking_refused")
+                return Reply("I'm not able to add another booking on this call. Please contact reception on "
+                             f"{self.s.hospital_phone}.", flow["purpose"], options=MENU)
             return Reply("This phone number already has the maximum number of upcoming appointments, so I can't "
                          f"add another. Please cancel one first, or call reception on {self.s.hospital_phone}.",
                          flow["purpose"], outcome="limit", options=MENU)
