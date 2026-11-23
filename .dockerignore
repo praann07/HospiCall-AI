@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.pyc
+**/.env*
+**/.coverage
+**/.pytest_cache
+**/.ruff_cache
+**/*.db
+.venv
+.git
+data
+backend/tests
+backend/evals
+docs
