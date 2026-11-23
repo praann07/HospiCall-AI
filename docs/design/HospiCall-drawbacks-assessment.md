@@ -1,3 +1,6 @@
+> **Historical design document.** Written before the v1.0 rewrite; it describes the original vision and some items were never built or were built differently.
+> For what is actually implemented, see the [README](../../README.md) and [AGENT_DESIGN.md](../AGENT_DESIGN.md).
+
 # HospiCall — Drawbacks Self-Assessment (Completed)
 
 > Context: This is a **zero-cost demo** (15-day build, laptop hardware, solo dev) targeting funding, NOT production. Ratings reflect demo-acceptability plus production-readiness where stated.

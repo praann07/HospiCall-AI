@@ -19,3 +19,13 @@ venv/
 # Editor/OS
 .DS_Store
 Thumbs.db
+
+# Local config & test artefacts
+.env
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+data/*.db-wal
+data/*.db-shm
+backend/data/
