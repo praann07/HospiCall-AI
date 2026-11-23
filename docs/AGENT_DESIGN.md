@@ -105,6 +105,12 @@ specialty, doctor name, day, daypart, hour, name and safety flags.
 Not guarded, deliberately: caller identity is "last four digits of the number you called from". Real telephony supplies
 a trustworthy caller ID; the browser demo does not. That limit is documented rather than hidden.
 
+Consequently an unverified caller can still *infer* a little by attempting bookings under someone else's number: a
+listed slot answered with "just taken", or a generic refusal after three bookings, hints that the number already holds
+an appointment. Anyone able to claim the number can also pass last-4 verification, so closing this fully needs real
+caller authentication (carrier caller ID or a one-time code), not more wording tricks. Until then nothing about the
+appointments themselves is ever disclosed without verification.
+
 ## 5. Failure handling
 
 | Dependency | Failure | Behaviour |
